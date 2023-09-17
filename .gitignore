@@ -1,0 +1,7 @@
+bin/
+build/
+.vscode
+vgcore*
+*.equ
+__pycache__
+updates/
