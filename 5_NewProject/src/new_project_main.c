@@ -1,6 +1,6 @@
 #include "signal_handler.h"
 #include "socket_io.h"
-#include "tcp_server.h"
+#include "tcp_server_new.h"
 #include "utilities.h"
 
 #define MAX_BUFF_SIZE 14
@@ -9,7 +9,8 @@ static int echo(int client_fd);
 
 int main(int argc, char ** argv)
 {
-    int exit_code = E_FAILURE;
+    int        exit_code = E_FAILURE;
+    server_t * server_p  = NULL;
     (void)argc;
     (void)argv;
 
@@ -20,10 +21,18 @@ int main(int argc, char ** argv)
         goto END;
     }
 
-    exit_code = start_server(4, "31337", echo);
+    // exit_code = start_server(4, "31337", echo);
+    server_p = init_server("31337", 4, echo);
+    if (NULL == server_p)
+    {
+        print_error("main(): Failed to initialize server.");
+        goto END;
+    }
+
+    exit_code = start_server(server_p);
     if (E_SUCCESS != exit_code)
     {
-        print_error("failure.");
+        print_error("main(): Failed to start server.");
         goto END;
     }
 
