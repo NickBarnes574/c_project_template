@@ -8,7 +8,7 @@
 
 #include "threadpool.h"
 
-#define SHUTDOWN 1
+#define SIG_SHUTDOWN 1
 
 typedef int (*request_handler_t)(int);
 
@@ -26,8 +26,11 @@ server_t * init_server(char *            port_p,
                        size_t            max_connections,
                        request_handler_t client_request_p);
 
-int start_server(server_t * server_p);
-int stop_server();
+int run_server(char *            port_p,
+               size_t            max_connections,
+               request_handler_t client_request_p);
+
+int destroy_server(server_t ** server_p);
 
 #endif /* _TCP_SERVER_NEW_H */
 

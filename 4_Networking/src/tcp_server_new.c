@@ -130,31 +130,29 @@ END:
     return server_p;
 }
 
-int start_server(server_t * server_p)
+int run_server(char *            port_p,
+               size_t            max_connections,
+               request_handler_t client_request_p)
 {
-    int exit_code = E_FAILURE;
+    int        exit_code = E_FAILURE;
+    server_t * server_p  = NULL;
 
+    if ((NULL == port_p) || (NULL == client_request_p))
+    {
+        print_error("run_server(): NULL argument passed.");
+        goto END;
+    }
+
+    if (2 > max_connections)
+    {
+        print_error("run_server(): Max connections must be 2 or more.");
+        goto END;
+    }
+
+    server_p = init_server(port_p, max_connections, client_request_p);
     if (NULL == server_p)
     {
-        print_error("start_server(): NULL server.");
-        goto END;
-    }
-
-    if (NULL == server_p->threadpool_p)
-    {
-        print_error("start_server(): NULL threadpool.");
-        goto END;
-    }
-
-    if (NULL == server_p->client_request_p)
-    {
-        print_error("start_server(): NULL client request function.");
-        goto END;
-    }
-
-    if (NULL == server_p->settings_p)
-    {
-        print_error("start_server(): NULL configuration settings.");
+        print_error("run_server(): Failed to initialize server.");
         goto END;
     }
 
@@ -166,22 +164,21 @@ int start_server(server_t * server_p)
         if ((signal_flag_g == SIGINT) || (signal_flag_g) == SIGUSR1)
         {
             printf("\nShutdown signal received.\n");
-            exit_code = SHUTDOWN;
-            goto END;
+            goto SHUTDOWN;
         }
 
         exit_code = accept_new_connection(server_p->settings_p);
         if (E_SUCCESS != exit_code)
         {
-            print_error("start_server(): Unable to accept new connection.");
-            goto END;
+            print_error("run_server(): Unable to accept new connection.");
+            goto SHUTDOWN;
         }
 
         client_args_t * args_p = calloc(1, sizeof(client_args_t));
         if (NULL == args_p)
         {
-            print_error("start_server(): args_p - CMR failure.");
-            goto END;
+            print_error("run_server(): args_p - CMR failure.");
+            goto SHUTDOWN;
         }
 
         args_p->client_fd    = server_p->settings_p->client_fd;
@@ -192,12 +189,47 @@ int start_server(server_t * server_p)
             server_p->threadpool_p, handle_client_request, NULL, args_p);
         if (E_SUCCESS != exit_code)
         {
-            print_error("start_server(): Unable to add job to threadpool.");
-            goto END;
+            print_error("run_server(): Unable to add job to threadpool.");
+            goto SHUTDOWN;
         }
 
         print_client_address(server_p->settings_p);
     }
+
+SHUTDOWN:
+    exit_code = destroy_server(&server_p);
+    if (E_SUCCESS != exit_code)
+    {
+        print_error("run_server(): Failed to destroy server.");
+        goto END;
+    }
+
+END:
+    return exit_code;
+}
+
+int destroy_server(server_t ** server_p)
+{
+    int exit_code = E_FAILURE;
+    if ((NULL == server_p) || (NULL == (*server_p)))
+    {
+        print_error("destroy_server(): NULL argument passed.");
+        goto END;
+    }
+
+    exit_code = threadpool_destroy(&(*server_p)->threadpool_p);
+    if (E_SUCCESS != exit_code)
+    {
+        print_error("destroy_server(): Unable to destroy threadpool.");
+    }
+
+    close((*server_p)->listening_socket);
+
+    free((*server_p)->settings_p);
+    (*server_p)->settings_p = NULL;
+
+    free(*server_p);
+    *server_p = NULL;
 
     exit_code = E_SUCCESS;
 END:
@@ -221,7 +253,7 @@ static int accept_new_connection(config_t * config_p)
         if ((signal_flag_g == SIGINT) || (signal_flag_g == SIGUSR1))
         {
             printf("\nShutdown signal received.\n");
-            exit_code = SHUTDOWN;
+            exit_code = SIG_SHUTDOWN;
             goto END;
         }
 

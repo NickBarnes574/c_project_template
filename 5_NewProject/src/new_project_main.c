@@ -9,8 +9,7 @@ static int echo(int client_fd);
 
 int main(int argc, char ** argv)
 {
-    int        exit_code = E_FAILURE;
-    server_t * server_p  = NULL;
+    int exit_code = E_FAILURE;
     (void)argc;
     (void)argv;
 
@@ -21,18 +20,10 @@ int main(int argc, char ** argv)
         goto END;
     }
 
-    // exit_code = start_server(4, "31337", echo);
-    server_p = init_server("31337", 4, echo);
-    if (NULL == server_p)
-    {
-        print_error("main(): Failed to initialize server.");
-        goto END;
-    }
-
-    exit_code = start_server(server_p);
+    exit_code = run_server("31337", 4, echo);
     if (E_SUCCESS != exit_code)
     {
-        print_error("main(): Failed to start server.");
+        print_error("main(): Unable to run server.");
         goto END;
     }
 

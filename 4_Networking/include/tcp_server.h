@@ -29,9 +29,9 @@ typedef int (*request_handler_t)(int);
  */
 typedef struct server_cfg server_cfg_t;
 
-int start_server(size_t            num_threads,
-                 char *            port_p,
-                 request_handler_t handler_func);
+int run_server(size_t            num_threads,
+               char *            port_p,
+               request_handler_t handler_func);
 
 #endif /* _SERVER_H */
 

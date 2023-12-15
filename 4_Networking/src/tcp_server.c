@@ -158,9 +158,9 @@ static void * handle_client_request(void * args_p);
 // |                            MAIN SERVER FUNCTION                           |
 // +---------------------------------------------------------------------------+
 
-int start_server(size_t            num_threads,
-                 char *            port_p,
-                 request_handler_t handler_func)
+int run_server(size_t            num_threads,
+               char *            port_p,
+               request_handler_t handler_func)
 {
     int            exit_code    = E_FAILURE;
     server_cfg_t * config       = NULL;
@@ -181,7 +181,7 @@ int start_server(size_t            num_threads,
     threadpool_p = threadpool_create(num_threads);
     if (NULL == threadpool_p)
     {
-        print_error("start_server(): Unable to create threadpool.");
+        print_error("run_server(): Unable to create threadpool.");
         goto END;
     }
 
@@ -237,7 +237,7 @@ END:
         exit_code = threadpool_destroy(&threadpool_p);
         if (E_SUCCESS != exit_code)
         {
-            print_error("start_server(): Unable to destroy threadpool.");
+            print_error("run_server(): Unable to destroy threadpool.");
         }
     }
 
