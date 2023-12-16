@@ -189,6 +189,8 @@ int start_server(char * port_p,
         if (NULL == new_job_p)
         {
             print_error("start_server(): new_job_p - CMR failure.");
+            free(client_data_p);
+            client_data_p = NULL;
             goto SHUTDOWN;
         }
 
@@ -205,11 +207,6 @@ int start_server(char * port_p,
             goto SHUTDOWN;
         }
 
-        free(client_data_p);
-        client_data_p = NULL;
-        free(new_job_p);
-        new_job_p = NULL;
-
         print_client_address(server_p->settings_p);
     }
 
@@ -222,11 +219,6 @@ SHUTDOWN:
     }
 
 END:
-    free(client_data_p);
-    client_data_p = NULL;
-    free(new_job_p);
-    new_job_p = NULL;
-
     return exit_code;
 }
 
@@ -443,6 +435,11 @@ static void * handle_client_request(void * args_p)
 
     data_p = (client_data_t *)job_p->args_p;
     close(data_p->client_fd);
+
+    free(data_p);
+    data_p = NULL;
+    free(job_p);
+    job_p = NULL;
 
 END:
     return result_p;

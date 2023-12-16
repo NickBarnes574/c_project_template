@@ -11,6 +11,8 @@
 typedef struct user_shared_data
 {
     int placeholder;
+    // Any other user data goes here.
+    // hash tables for instance...
 } user_shared_data_t;
 
 static void * process_request(void * arg_p);
