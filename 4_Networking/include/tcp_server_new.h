@@ -28,15 +28,22 @@ typedef struct server
     config_t * settings_p;
 } server_t;
 
+typedef struct client_data
+{
+    int    client_fd;
+    void * user_data_p;
+} client_data_t;
+
 server_t * init_server(char * port_p,
                        size_t max_connections,
                        void * (*client_request_handler)(void *),
                        void (*client_data_free_func)(void *));
 
-int run_server(char * port_p,
-               size_t max_connections,
-               void * (*client_request_handler)(void *),
-               void (*client_data_free_func)(void *));
+int start_server(char * port_p,
+                 size_t max_connections,
+                 void * (*client_request_handler)(void *),
+                 void (*client_data_free_func)(void *),
+                 void * user_data_p);
 
 int destroy_server(server_t ** server_p);
 

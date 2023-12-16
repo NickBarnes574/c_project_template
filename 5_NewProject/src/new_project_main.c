@@ -3,13 +3,22 @@
 #include "tcp_server_new.h"
 #include "utilities.h"
 
-#define MAX_BUFF_SIZE 14
+#include <unistd.h>
 
-static int echo(int client_fd);
+#define MAX_BUFF_SIZE   14
+#define PLACEHOLDER_NUM 10
+
+typedef struct user_shared_data
+{
+    int placeholder;
+} user_shared_data_t;
+
+static void * process_request(void * arg_p);
 
 int main(int argc, char ** argv)
 {
-    int exit_code = E_FAILURE;
+    int                exit_code   = E_FAILURE;
+    user_shared_data_t shared_data = { 0 };
     (void)argc;
     (void)argv;
 
@@ -20,7 +29,9 @@ int main(int argc, char ** argv)
         goto END;
     }
 
-    exit_code = run_server("31337", 4, echo);
+    shared_data.placeholder = PLACEHOLDER_NUM;
+
+    exit_code = start_server("31337", 4, process_request, NULL, &shared_data);
     if (E_SUCCESS != exit_code)
     {
         print_error("main(): Unable to run server.");
@@ -31,10 +42,10 @@ END:
     return exit_code;
 }
 
-static int echo(int client_fd)
+int echo(int client_fd)
 {
+    int     exit_code = E_FAILURE;
     uint8_t buffer[MAX_BUFF_SIZE];
-    int     exit_code;
 
     // Receive data from the client
     exit_code = recv_data(client_fd, buffer, sizeof(buffer));
@@ -56,4 +67,34 @@ static int echo(int client_fd)
 
 END:
     return exit_code;
+}
+
+static void * process_request(void * arg_p)
+{
+    int                  exit_code;
+    client_data_t *      data_p        = NULL;
+    user_shared_data_t * shared_data_p = NULL;
+    int                  client_fd     = -1;
+
+    if (NULL == arg_p)
+    {
+        print_error("process_request(): NULL argument passed.");
+        goto END;
+    }
+
+    data_p        = (client_data_t *)arg_p;
+    shared_data_p = (user_shared_data_t *)data_p->user_data_p;
+    client_fd     = data_p->client_fd;
+
+    printf("placeholder: %d\n", shared_data_p->placeholder);
+
+    exit_code = echo(client_fd);
+    if (E_SUCCESS != exit_code)
+    {
+        print_error("process_request(): Error processing echo request.");
+        goto END;
+    }
+
+END:
+    return NULL;
 }
