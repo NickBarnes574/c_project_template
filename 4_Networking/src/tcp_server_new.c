@@ -37,11 +37,10 @@ struct config
     socklen_t               client_len; // Length of client address structure
 };
 
-typedef struct client_args
+typedef struct client_data
 {
-    int               client_fd;
-    request_handler_t handler_func;
-} client_args_t;
+    int client_fd;
+} client_data_t;
 
 static int    configure_server_address(config_t * config_p, char * port_p);
 static int    create_listening_socket(config_t * config_p);
@@ -49,16 +48,17 @@ static int    accept_new_connection(config_t * config_p);
 static void   print_client_address(config_t * config_p);
 static void * handle_client_request(void * args_p);
 
-server_t * init_server(char *            port_p,
-                       size_t            max_connections,
-                       request_handler_t client_request_p)
+server_t * init_server(char * port_p,
+                       size_t max_connections,
+                       void * (*client_request_handler)(void *),
+                       void (*client_data_free_func)(void *))
 {
     int            exit_code    = E_FAILURE;
     threadpool_t * threadpool_p = NULL;
     config_t *     config_p     = NULL;
     server_t *     server_p     = NULL;
 
-    if ((NULL == port_p) || (NULL == client_request_p))
+    if ((NULL == port_p))
     {
         print_error("init_server(): NULL argument passed.");
         goto END;
@@ -109,10 +109,11 @@ server_t * init_server(char *            port_p,
         goto END;
     }
 
-    server_p->listening_socket = config_p->listening_socket;
-    server_p->threadpool_p     = threadpool_p;
-    server_p->client_request_p = client_request_p;
-    server_p->settings_p       = config_p;
+    server_p->listening_socket       = config_p->listening_socket;
+    server_p->threadpool_p           = threadpool_p;
+    server_p->client_request_handler = client_request_handler;
+    server_p->client_data_free_func  = client_data_free_func;
+    server_p->settings_p             = config_p;
 
 END:
     if (E_SUCCESS != exit_code)
@@ -130,14 +131,17 @@ END:
     return server_p;
 }
 
-int run_server(char *            port_p,
-               size_t            max_connections,
-               request_handler_t client_request_p)
+int run_server(char * port_p,
+               size_t max_connections,
+               void * (*client_request_handler)(void *),
+               void (*client_data_free_func)(void *))
 {
-    int        exit_code = E_FAILURE;
-    server_t * server_p  = NULL;
+    int                exit_code     = E_FAILURE;
+    server_t *         server_p      = NULL;
+    client_data_t *    client_data_p = NULL;
+    tcp_server_job_t * new_job_p     = NULL;
 
-    if ((NULL == port_p) || (NULL == client_request_p))
+    if ((NULL == port_p))
     {
         print_error("run_server(): NULL argument passed.");
         goto END;
@@ -149,7 +153,8 @@ int run_server(char *            port_p,
         goto END;
     }
 
-    server_p = init_server(port_p, max_connections, client_request_p);
+    server_p = init_server(
+        port_p, max_connections, client_request_handler, client_data_free_func);
     if (NULL == server_p)
     {
         print_error("run_server(): Failed to initialize server.");
@@ -174,19 +179,27 @@ int run_server(char *            port_p,
             goto SHUTDOWN;
         }
 
-        client_args_t * args_p = calloc(1, sizeof(client_args_t));
-        if (NULL == args_p)
+        client_data_p = calloc(1, sizeof(client_data_t));
+        if (NULL == client_data_p)
         {
-            print_error("run_server(): args_p - CMR failure.");
+            print_error("run_server(): client_data_p - CMR failure.");
             goto SHUTDOWN;
         }
 
-        args_p->client_fd    = server_p->settings_p->client_fd;
-        args_p->handler_func = server_p->client_request_p;
+        new_job_p = calloc(1, sizeof(tcp_server_job_t));
+        if (NULL == new_job_p)
+        {
+            print_error("run_server(): new_job_p - CMR failure.");
+            goto SHUTDOWN;
+        }
+
+        new_job_p->client_function = client_request_handler;
+        new_job_p->free_function   = client_data_free_func;
+        new_job_p->args_p          = client_data_p;
 
         // Queue up a new client job to be processed
         exit_code = threadpool_add_job(
-            server_p->threadpool_p, handle_client_request, NULL, args_p);
+            server_p->threadpool_p, handle_client_request, NULL, new_job_p);
         if (E_SUCCESS != exit_code)
         {
             print_error("run_server(): Unable to add job to threadpool.");
@@ -205,6 +218,11 @@ SHUTDOWN:
     }
 
 END:
+    free(client_data_p);
+    client_data_p = NULL;
+    free(new_job_p);
+    new_job_p = NULL;
+
     return exit_code;
 }
 
@@ -398,23 +416,52 @@ static void print_client_address(config_t * config_p)
 
 static void * handle_client_request(void * args_p)
 {
-    int             exit_code  = E_FAILURE;
-    client_args_t * new_args_p = (client_args_t *)args_p;
+    tcp_server_job_t * job_p    = NULL;
+    void *             result_p = NULL;
 
-    exit_code = new_args_p->handler_func(new_args_p->client_fd);
-    if (E_SUCCESS != exit_code)
+    if (NULL == args_p)
     {
-        print_error("Error handling client request.");
+        print_error("handle_client_request(): NULL job passed.");
         goto END;
     }
 
-END:
-    if (NULL != new_args_p)
+    job_p = (tcp_server_job_t *)args_p;
+
+    // Execute the custom function
+    result_p = job_p->client_function(job_p->args_p);
+
+    // Free any resources if required
+    if (NULL != job_p->free_function)
     {
-        close(new_args_p->client_fd);
+        job_p->free_function(job_p->args_p);
     }
-    free(new_args_p);
-    return NULL;
+
+    free(job_p);
+    job_p = NULL;
+
+END:
+    return result_p;
 }
+
+// static void * handle_client_request(void * args_p)
+// {
+//     int             exit_code  = E_FAILURE;
+//     client_args_t * new_args_p = (client_args_t *)args_p;
+
+//     exit_code = new_args_p->handler_func(new_args_p->client_fd);
+//     if (E_SUCCESS != exit_code)
+//     {
+//         print_error("Error handling client request.");
+//         goto END;
+//     }
+
+// END:
+//     if (NULL != new_args_p)
+//     {
+//         close(new_args_p->client_fd);
+//     }
+//     free(new_args_p);
+//     return NULL;
+// }
 
 /*** end of file ***/
