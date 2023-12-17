@@ -1,6 +1,6 @@
 #include "signal_handler.h"
 #include "socket_io.h"
-#include "tcp_server_new.h"
+#include "tcp_server.h"
 #include "utilities.h"
 
 #include <unistd.h>
@@ -33,7 +33,8 @@ int main(int argc, char ** argv)
 
     shared_data.placeholder = PLACEHOLDER_NUM;
 
-    exit_code = start_server("31337", 4, process_request, NULL, &shared_data);
+    exit_code =
+        start_tcp_server("31337", 4, process_request, NULL, &shared_data);
     if (E_SUCCESS != exit_code)
     {
         print_error("main(): Unable to run server.");
