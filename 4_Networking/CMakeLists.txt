@@ -6,8 +6,8 @@ project(Networking LANGUAGES C)
 
 # Library Sources
 set(LIBRARY_SOURCES
-    # src/tcp_server.c
     src/tcp_server.c
+    src/udp_server.c
     src/socket_io.c
     )
 

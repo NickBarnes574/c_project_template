@@ -12,7 +12,7 @@
 
 typedef struct config config_t;
 
-typedef void * (*client_request_handler_t)(void *);
+typedef void * (*tcp_request_t)(void *);
 typedef void (*client_data_free_func_t)(void *);
 
 typedef struct tcp_server_job
@@ -24,11 +24,11 @@ typedef struct tcp_server_job
 
 typedef struct server
 {
-    int                      listening_socket;
-    threadpool_t *           threadpool_p;
-    client_request_handler_t client_request_handler;
-    client_data_free_func_t  client_data_free_func;
-    config_t *               settings_p;
+    int                     listening_socket;
+    threadpool_t *          threadpool_p;
+    tcp_request_t           client_request_handler;
+    client_data_free_func_t client_data_free_func;
+    config_t *              settings_p;
 } server_t;
 
 typedef struct client_data
@@ -58,11 +58,11 @@ typedef struct client_data
  * @note The function uses a continuous loop to monitor incoming connections and
  * can be exited on SIGINT or SIGUSR1.
  */
-int start_tcp_server(char *                   port_p,
-                     size_t                   max_connections,
-                     client_request_handler_t client_request_handler,
-                     client_data_free_func_t  client_data_free_func,
-                     void *                   user_data_p);
+int start_tcp_server(char *                  port_p,
+                     size_t                  max_connections,
+                     tcp_request_t           client_request_handler,
+                     client_data_free_func_t client_data_free_func,
+                     void *                  user_data_p);
 
 #endif /* _TCP_SERVER_NEW_H */
 

@@ -1,103 +1,82 @@
-#include "signal_handler.h"
-#include "socket_io.h"
-#include "tcp_server.h"
-#include "utilities.h"
+#define _GNU_SOURCE
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
-#define MAX_BUFF_SIZE   14
-#define PLACEHOLDER_NUM 10
+#include "utilities.h"
 
-typedef struct user_shared_data
+#define SERVER_PORT 12345
+#define BUFFER_SIZE 1024
+#define HELLO_WORLD "Hello World"
+#define ONE_SECOND  1
+
+int main()
 {
-    int placeholder;
-    // Any other user data goes here.
-    // hash tables for instance...
-} user_shared_data_t;
+    int                exit_code = E_FAILURE;
+    int                server_fd;
+    int                len;
+    struct sockaddr_in server_addr;
+    char               buffer[BUFFER_SIZE] = { 0 };
+    const char *       message_p           = HELLO_WORLD;
 
-static void * process_request(void * arg_p);
-
-int main(int argc, char ** argv)
-{
-    int                exit_code   = E_FAILURE;
-    user_shared_data_t shared_data = { 0 };
-    (void)argc;
-    (void)argv;
-
-    exit_code = signal_action_setup();
-    if (E_SUCCESS != exit_code)
+    // Create socket
+    server_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (E_SUCCESS != server_fd)
     {
-        print_error("main(): Unable to setup signal handler.");
+        perror("Socket creation failed");
         goto END;
     }
 
-    shared_data.placeholder = PLACEHOLDER_NUM;
+    // Set server address
+    server_addr.sin_family      = AF_INET;
+    server_addr.sin_port        = htons(SERVER_PORT);
+    server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    exit_code =
-        start_tcp_server("31337", 4, process_request, NULL, &shared_data);
-    if (E_SUCCESS != exit_code)
+    // Bind socket
+    if (E_SUCCESS !=
+        bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)))
     {
-        print_error("main(): Unable to run server.");
+        perror("Bind failed");
         goto END;
     }
+
+    printf("UDP server is running on port %d\n", SERVER_PORT);
+
+    while (1)
+    {
+        snprintf(buffer, BUFFER_SIZE, "%s\n", message_p);
+        len = strnlen(buffer, BUFFER_SIZE);
+
+        // Send message
+        if (sendto(server_fd,
+                   buffer,
+                   len,
+                   0,
+                   (struct sockaddr *)&server_addr,
+                   sizeof(server_addr)) < 0)
+        {
+            perror("Sendto failed");
+            break;
+        }
+
+        printf("Sent message: %s", buffer);
+
+        // Wait for 1 second
+        sleep(ONE_SECOND);
+    }
+
+    exit_code = E_SUCCESS;
 
 END:
+    if (server_fd >= 0)
+    {
+        close(server_fd);
+    }
+
     return exit_code;
-}
-
-int echo(int client_fd)
-{
-    int     exit_code = E_FAILURE;
-    uint8_t buffer[MAX_BUFF_SIZE];
-
-    // Receive data from the client
-    exit_code = recv_data(client_fd, buffer, sizeof(buffer));
-    if (E_SUCCESS != exit_code)
-    {
-        print_error("Failed to receive data from the client.");
-        goto END;
-    }
-
-    printf("%s\n", buffer);
-
-    // Send the received data back to the client
-    exit_code = send_data(client_fd, buffer, sizeof(buffer));
-    if (E_SUCCESS != exit_code)
-    {
-        print_error("Failed to send data back to the client.");
-        goto END;
-    }
-
-END:
-    return exit_code;
-}
-
-static void * process_request(void * arg_p)
-{
-    int                  exit_code;
-    client_data_t *      data_p        = NULL;
-    user_shared_data_t * shared_data_p = NULL;
-    int                  client_fd     = -1;
-
-    if (NULL == arg_p)
-    {
-        print_error("process_request(): NULL argument passed.");
-        goto END;
-    }
-
-    data_p        = (client_data_t *)arg_p;
-    shared_data_p = (user_shared_data_t *)data_p->user_data_p;
-    client_fd     = data_p->client_fd;
-
-    printf("placeholder: %d\n", shared_data_p->placeholder);
-
-    exit_code = echo(client_fd);
-    if (E_SUCCESS != exit_code)
-    {
-        print_error("process_request(): Error processing echo request.");
-        goto END;
-    }
-
-END:
-    return NULL;
 }

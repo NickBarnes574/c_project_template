@@ -137,10 +137,10 @@ static void * handle_client_request(void * args_p);
  * @return On success, returns a pointer to the initialized server_t structure.
  * On failure, returns NULL.
  */
-static server_t * init_server(char *                   port_p,
-                              size_t                   max_connections,
-                              client_request_handler_t client_request_handler,
-                              client_data_free_func_t  client_data_free_func);
+static server_t * init_server(char *                  port_p,
+                              size_t                  max_connections,
+                              tcp_request_t           client_request_handler,
+                              client_data_free_func_t client_data_free_func);
 
 /**
  * @brief Destroys the server and releases allocated resources.
@@ -157,10 +157,10 @@ static server_t * init_server(char *                   port_p,
  */
 static int destroy_server(server_t ** server_p);
 
-static server_t * init_server(char *                   port_p,
-                              size_t                   max_connections,
-                              client_request_handler_t client_request_handler,
-                              client_data_free_func_t  client_data_free_func)
+static server_t * init_server(char *                  port_p,
+                              size_t                  max_connections,
+                              tcp_request_t           client_request_handler,
+                              client_data_free_func_t client_data_free_func)
 {
     int            exit_code    = E_FAILURE;
     threadpool_t * threadpool_p = NULL;
@@ -240,11 +240,11 @@ END:
     return server_p;
 }
 
-int start_tcp_server(char *                   port_p,
-                     size_t                   max_connections,
-                     client_request_handler_t client_request_handler,
-                     client_data_free_func_t  client_data_free_func,
-                     void *                   user_data_p)
+int start_tcp_server(char *                  port_p,
+                     size_t                  max_connections,
+                     tcp_request_t           client_request_handler,
+                     client_data_free_func_t client_data_free_func,
+                     void *                  user_data_p)
 {
     int                exit_code     = E_FAILURE;
     server_t *         server_p      = NULL;
